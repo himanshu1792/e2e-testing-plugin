@@ -106,14 +106,22 @@ Write-Host ""
 
 Write-Host "STEP D — Per-project setup (in each Playwright project you want to test)" -ForegroundColor Yellow
 Write-Host ""
+Write-Host "  Install dependencies + browser binaries (the Script Writer also does this for you):"
+Write-Host ""
+Write-Host "    npm install --save-dev @playwright/test dotenv" -ForegroundColor Gray
+Write-Host "    npx playwright install chromium"                 -ForegroundColor Gray
+Write-Host ""
 Write-Host "  Add a .env at the project root:"
 Write-Host ""
 Write-Host "    APP_URL=https://your-staging-app.example.com" -ForegroundColor Gray
 Write-Host "    TEST_USERNAME=qa-automation@example.com"     -ForegroundColor Gray
 Write-Host "    TEST_PASSWORD=********"                       -ForegroundColor Gray
 Write-Host ""
-Write-Host "  Make sure your playwright.config.ts loads dotenv:"
+Write-Host "  Make sure your playwright.config.ts loads dotenv and runs headless:"
 Write-Host "    import 'dotenv/config';" -ForegroundColor Gray
+Write-Host "    use: { baseURL: process.env.APP_URL, headless: true }" -ForegroundColor Gray
+Write-Host ""
+Write-Host "  (Script Writer authors live in a headed MCP browser; Reviewer runs specs headless.)" -ForegroundColor DarkGray
 Write-Host ""
 
 Write-Host "STEP E — Use the framework" -ForegroundColor Yellow

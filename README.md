@@ -81,6 +81,7 @@ All five agents and the entry slash command live globally at `~/.copilot/`. Your
 | **`uv`** (recommended) | For the Jira MCP server (`mcp-atlassian` via `uvx`). Install: <https://docs.astral.sh/uv/> |
 | **A Jira or ADO account** | With a Personal Access Token for the platform you use |
 | **A Playwright project** | The framework generates specs into your existing project. If you don't have one, the Script Writer agent can scaffold one for you. |
+| **Playwright browser binaries** | Installed per-project via `npx playwright install chromium` (the Script Writer runs this for you on first use). See [Per-project setup](#per-project-setup). |
 
 ---
 
@@ -234,7 +235,37 @@ If they're missing, see [Troubleshooting](#troubleshooting).
 
 For each Playwright project you want to run E2E tests against:
 
-### 1. Create a `.env` at the project root
+### 1. Install dependencies & browser binaries
+
+The Script Writer agent does this automatically on first run, but you can set it up ahead of time. You need two npm dev-dependencies **plus the Playwright browser binaries** — the binaries are a separate download (the step people most often forget):
+
+```bash
+# Test runner + env loader
+npm install --save-dev @playwright/test dotenv
+
+# Browser binaries (NOT an npm package — downloaded separately)
+npx playwright install chromium
+#   On Linux/CI, also pull system libraries:
+#   npx playwright install --with-deps chromium
+```
+
+Add these scripts to `package.json` so runs are one command:
+
+```json
+{
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "dotenv": "^16.4.5"
+  }
+}
+```
+
+### 2. Create a `.env` at the project root
 
 ```bash
 APP_URL=https://your-staging-app.example.com
@@ -244,7 +275,7 @@ TEST_PASSWORD=********
 
 Add `.env` to your `.gitignore`. Commit a `.env.example` with empty values instead.
 
-### 2. Confirm `playwright.config.ts` loads dotenv
+### 3. Confirm `playwright.config.ts` loads dotenv and runs headless
 
 ```typescript
 import { defineConfig, devices } from '@playwright/test';
@@ -256,6 +287,7 @@ export default defineConfig({
   retries: 0,                                        // Reviewer agent handles iteration
   use: {
     baseURL: process.env.APP_URL,                    // <-- required
+    headless: true,                                  // <-- Reviewer runs headless (CI-parity)
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -266,13 +298,12 @@ export default defineConfig({
 });
 ```
 
-Install `dotenv` if you don't have it:
+> **Headed vs headless — the framework uses both, on purpose:**
+> - The **Script Writer** authors scripts live in a **headed** browser (`headless: false`) through the Playwright **MCP server**, so you watch the script get built. That browser is the `playwright` entry in your VS Code MCP config — it has no `--headless` flag.
+> - The **Reviewer** runs the finished specs **headless** (`headless: true`) via `npx playwright test`, governed by the `use.headless` setting above — fast and CI-equivalent.
+> - They're two different browsers driven by two different mechanisms, so they never collide. To watch a Reviewer run while debugging: `npm run test:e2e:headed`.
 
-```bash
-npm install --save-dev dotenv
-```
-
-### 3. (Optional) Pre-create directories
+### 4. (Optional) Pre-create directories
 
 The agents will create these on demand, but you can pre-create:
 

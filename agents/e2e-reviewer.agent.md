@@ -22,11 +22,16 @@ Run the Playwright specs the Script Writer just generated, classify any failures
 
 ## Workflow
 
-### Step 1 — Initial run
+### Step 1 — Initial run (headless)
 
-Run all newly generated specs:
+Run all newly generated specs **headless** — this is your default and gives CI parity. The workspace `playwright.config.ts` sets `headless: true`, so the runner is headless without any flag:
 ```
 npx playwright test --reporter=list
+```
+
+Only add `--headed` when you need to *watch* a specific flaky repro with your own eyes:
+```
+npx playwright test tests/<spec>.spec.ts --headed   # debugging a flake only
 ```
 
 Capture:
@@ -71,12 +76,28 @@ npx playwright test <spec-path> --repeat-each=3
 
 If any of the 3 runs fails, treat as flaky and iterate (still within the per-spec budget of 3 total iterations including the initial run).
 
-### Step 5 — Banned patterns sweep
+### Step 5 — Anti-fake-green lint (a passing test that doesn't assert is worse than a failing one)
 
-Before declaring done, grep the generated specs for banned patterns and replace:
-- `page.waitForTimeout(` → replace with `expect(...).toBeVisible()` or `waitForResponse(...)`
-- `if (await ...isVisible())` → replace with `await expect(...).toBeVisible()`
-- Hardcoded `https://` URLs → replace with `baseURL` + relative paths
+A green checkmark means nothing if the test doesn't actually verify its AC. Before declaring done, scan **every** spec for "fake green" and fix or quarantine each hit. A passing test that doesn't truly assert its acceptance criterion is a silent lie — treat it as a defect, not a pass.
+
+**Run these greps across `tests/**/*.spec.ts`:**
+
+| Check | Grep signal | Why it's fake | Fix |
+|---|---|---|---|
+| **No assertion** | a `test(...)` body with zero `await expect(` | Test navigates/clicks but verifies nothing — always green | Add the real assertion for the scenario's expected outcome (use `browser_snapshot` to find the right locator) |
+| **Tautological assert** | `expect(true)`, `expect(1).toBe(1)`, `expect(false).toBeFalsy()` | Asserts a constant — can never fail | Replace with an assertion on the AC's observable outcome |
+| **Vacuous target** | `expect(page.locator('body'))`, `expect(page).toBeTruthy()`, `toBeVisible()` on `html`/`body`/root | Asserts something always present — proves nothing about the AC | Assert the specific element/text the AC describes |
+| **Hidden skip** | `test.skip(` that is **unconditional** or hides a real failure (vs. legit `test.skip(process.env.X, ...)`) | Removes the test from the count to fake green | Restore it; if truly flaky, use `test.fixme()` with a reason (Step 3), never `skip` to hide |
+| **Commented assertion** | `// await expect(`, `// expect(` | Assertion was disabled to make it pass | Re-enable and fix the underlying issue |
+| **Soft-only** | `expect.soft(` with no hard `expect(` in the same test | Soft assertions don't fail the test on their own | Add at least one hard assertion for the primary outcome |
+| **AC mismatch** | assertion present but unrelated to the scenario's expected outcome | Tests the wrong thing | Re-point the assertion at what the AC actually claims |
+
+**Default stance:** a spec is **not trusted** until you can point to a concrete `await expect(...)` that maps to its AC's expected outcome. If a test can't be made to genuinely assert its AC within the 3-iteration budget, **quarantine it** (`test.fixme()` + reason) — do not let it pass review as green.
+
+**Then sweep the banned patterns and replace:**
+- `page.waitForTimeout(` → `expect(...).toBeVisible()` or `waitForResponse(...)`
+- `if (await ...isVisible())` → `await expect(...).toBeVisible()`
+- Hardcoded `https://` URLs → `baseURL` + relative paths
 - Logged credentials (`console.log(process.env.TEST_PASSWORD)`) → remove immediately
 
 ### Step 6 — Summarize
@@ -109,6 +130,7 @@ Trigger the handoff to the Report Generator.
 - **Hard cap: 3 iterations per spec.** No infinite loops.
 - **Never delete a spec to make CI green.** Quarantine via `test.fixme()` + comment.
 - **Never lower an assertion to pass.** If the AC says "user sees X", the assertion checks for X.
+- **A test with no real assertion is a defect, not a pass.** Run the Step 5 anti-fake-green lint on every spec; fix or quarantine each hit.
 - **Use traces.** When stuck, open the trace: `npx playwright show-trace <path>`.
 - **Read credentials from `process.env`.** Never log them.
 - **Banned:** `page.waitForTimeout`, bare `isVisible()` checks, hardcoded URLs.

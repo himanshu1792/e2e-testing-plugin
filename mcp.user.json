@@ -1,5 +1,6 @@
 {
   "_comment": "Paste the 'servers' block (and its contents) into your VS Code User MCP config. Open it via: Ctrl/Cmd+Shift+P -> 'MCP: Open User Configuration'. Do NOT paste the _comment field — it's just guidance.",
+  "_comment_playwright": "The playwright server runs HEADED (no --headless flag) so the Script Writer's live authoring is visible. The Reviewer runs finished specs headless via 'npx playwright test' (governed by use.headless in the project's playwright.config.ts) — a separate mechanism, so there is no conflict. If you never want to see a browser, add '--headless' to the args below.",
 
   "servers": {
     "playwright": {

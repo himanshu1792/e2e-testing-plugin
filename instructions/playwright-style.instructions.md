@@ -117,6 +117,7 @@ export default defineConfig({
   retries: 0,                                  // Reviewer agent handles iteration explicitly
   use: {
     baseURL: process.env.APP_URL,
+    headless: true,                            // Reviewer runs specs headless (CI-parity); Script Writer authors via a SEPARATE headed MCP browser
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -140,6 +141,11 @@ If any of these are missing in the user's config, patch them before generating s
 | `console.log(process.env.TEST_PASSWORD)` | Just remove. Never log secrets. |
 | `test.skip()` to hide a failure | `test.fixme()` with comment, or fix the test |
 | `expect(value)` (no `await`) | `await expect(value)` |
+| A `test()` body with **no** `await expect(` | Add a real assertion on the AC's expected outcome — a test that asserts nothing is fake-green |
+| `expect(true)`, `expect(1).toBe(1)` (tautology) | Assert the actual observable outcome the AC describes |
+| `expect(page.locator('body')).toBeVisible()` (vacuous) | Assert the specific element/text the AC names |
+| `expect.soft(...)` as the only assertion | Add at least one hard `await expect(...)` for the primary outcome |
+| `// await expect(...)` (commented-out assertion) | Re-enable it and fix the underlying issue |
 
 ## Comments
 
