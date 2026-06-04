@@ -1,0 +1,21 @@
+# Local Claude Code settings (machine-specific)
+.claude/
+
+# Secrets — never commit real credentials
+.env
+.env.local
+*.pat
+
+# Node
+node_modules/
+
+# Playwright (generated in users' own projects, not this framework repo)
+test-results/
+playwright-report/
+playwright/.cache/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+*.log

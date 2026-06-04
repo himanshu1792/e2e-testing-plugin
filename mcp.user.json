@@ -1,0 +1,38 @@
+{
+  "_comment": "Paste the 'servers' block (and its contents) into your VS Code User MCP config. Open it via: Ctrl/Cmd+Shift+P -> 'MCP: Open User Configuration'. Do NOT paste the _comment field — it's just guidance.",
+
+  "servers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@latest",
+        "--isolated",
+        "--save-trace",
+        "--caps", "testing,devtools,storage"
+      ]
+    },
+
+    "jira": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["mcp-atlassian"],
+      "env": {
+        "JIRA_URL": "${env:JIRA_URL}",
+        "JIRA_PERSONAL_TOKEN": "${env:JIRA_PAT}",
+        "CONFLUENCE_URL": "${env:JIRA_URL}",
+        "CONFLUENCE_PERSONAL_TOKEN": "${env:JIRA_PAT}"
+      }
+    },
+
+    "azure-devops": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp"],
+      "env": {
+        "AZURE_DEVOPS_ORG": "${env:ADO_ORG}",
+        "AZURE_DEVOPS_PAT": "${env:ADO_PAT}"
+      }
+    }
+  }
+}
