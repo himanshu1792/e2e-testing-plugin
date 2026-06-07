@@ -1,6 +1,6 @@
 # E2E Testing Framework for GitHub Copilot
 
-A multi-agent E2E test generation framework for **VS Code GitHub Copilot**. Installs to your user profile (`~/.copilot/`) once, then works in any Playwright project on your machine.
+A multi-agent E2E test generation framework for **VS Code GitHub Copilot**. Set it up once — just ask Copilot to read this README — then it works in any Playwright project on your machine. Everything lives in your user profile (`~/.copilot/`).
 
 Type `/e2e-testing <jira-or-ado-story-url>` in Copilot Chat. Five specialist agents take it from story → scenarios → Playwright scripts → de-flaked specs → markdown report. Each phase ends with a single-click handoff button so you stay in control.
 
@@ -11,7 +11,7 @@ Type `/e2e-testing <jira-or-ado-story-url>` in Copilot Chat. Five specialist age
 1. [What it does](#what-it-does)
 2. [Architecture](#architecture)
 3. [Prerequisites](#prerequisites)
-4. [Install](#install)
+4. [Setup](#setup)
 5. [Configure environment variables](#configure-environment-variables)
 6. [Register MCP servers in VS Code](#register-mcp-servers-in-vs-code)
 7. [Per-project setup](#per-project-setup)
@@ -85,28 +85,96 @@ All five agents and the entry slash command live globally at `~/.copilot/`. Your
 
 ---
 
-## Install
+## Setup
 
-### Windows
+**There is no installer script.** You let Copilot set the framework up for you.
 
+1. Get this repo onto your machine and open the folder in VS Code:
+   ```bash
+   git clone <this-repo-url> e2e-copilot-framework
+   ```
+   Open the `e2e-copilot-framework` folder in VS Code.
+2. Open **Copilot Chat** and switch it to **Agent** mode.
+3. Send this message:
+
+   > **"Read `README.md` in this repository and set up this framework for me — copy the files into my Copilot user profile, register the VS Code settings, and configure the MCP servers. Ask me for any credentials you need."**
+
+Copilot follows the **Agent setup runbook** below. It will pause and ask you for the one thing it shouldn't do itself: your Jira/ADO tokens.
+
+---
+
+### Agent setup runbook
+
+> **This section is written for the AI agent doing the setup.** Execute the steps in order using your terminal and file-editing tools. Verify each step before continuing. **Never write secret tokens into chat, into `settings.json`, or into any committed file** — environment variables hold those.
+
+**Step 1 — Resolve the install directory.** The framework lives in the Copilot user-profile folder:
+- Windows: `%USERPROFILE%\.copilot\` (e.g. `C:\Users\<name>\.copilot\`)
+- macOS / Linux: `$HOME/.copilot/`
+
+Create these subfolders if they don't exist: `agents/`, `instructions/`, `prompts/`.
+
+**Step 2 — Copy the framework files** from this repo into that folder.
+
+Windows (PowerShell):
 ```powershell
-git clone <this-repo-url> e2e-copilot-framework
-cd e2e-copilot-framework
-.\install.ps1
+$dst = "$env:USERPROFILE\.copilot"
+New-Item -ItemType Directory -Force -Path "$dst\agents","$dst\instructions","$dst\prompts" | Out-Null
+Copy-Item -Force agents\*.agent.md               "$dst\agents\"
+Copy-Item -Force instructions\*.instructions.md  "$dst\instructions\"
+Copy-Item -Force prompts\*.prompt.md             "$dst\prompts\"
 ```
 
-The installer copies files to `%USERPROFILE%\.copilot\` (typically `C:\Users\<you>\.copilot\`).
-
-### macOS / Linux
-
+macOS / Linux:
 ```bash
-git clone <this-repo-url> e2e-copilot-framework
-cd e2e-copilot-framework
-chmod +x install.sh
-./install.sh
+dst="$HOME/.copilot"
+mkdir -p "$dst/agents" "$dst/instructions" "$dst/prompts"
+cp -f agents/*.agent.md             "$dst/agents/"
+cp -f instructions/*.instructions.md "$dst/instructions/"
+cp -f prompts/*.prompt.md           "$dst/prompts/"
 ```
 
-The installer copies files to `~/.copilot/`.
+**Step 3 — Register the locations in VS Code user settings** so VS Code actually loads them. Open the user `settings.json`:
+- Windows: `%APPDATA%\Code\User\settings.json`
+- macOS: `$HOME/Library/Application Support/Code/User/settings.json`
+- Linux: `$HOME/.config/Code/User/settings.json`
+
+(VS Code Insiders: replace `Code` with `Code - Insiders`.)
+
+Merge the keys below. Create the file as `{}` if it's missing; **preserve any existing keys**. Replace `<HOME>` with the **absolute** home path (expand `~` / `%USERPROFILE%`) — do not leave a literal `~`. Each value is an object mapping the folder to `true`:
+
+```jsonc
+{
+  "chat.promptFilesLocations":       { "<HOME>/.copilot/prompts": true },
+  "chat.instructionsFilesLocations": { "<HOME>/.copilot/instructions": true },
+  // The custom-agent location setting was renamed across VS Code versions.
+  // Search the Settings UI for "agent files" / "mode files" and set whichever ID exists.
+  // Setting both is harmless — VS Code ignores an unknown key:
+  "chat.modeFilesLocations":         { "<HOME>/.copilot/agents": true },
+  "chat.agentFilesLocations":        { "<HOME>/.copilot/agents": true }
+}
+```
+
+> Newer VS Code builds may read `~/.copilot/agents` natively without the `*FilesLocations` entry — but adding it is safe and guarantees the agents load across versions. This is the step that prevents a silent "files copied but nothing shows up" failure.
+
+**Step 4 — Configure the MCP servers.** Open the VS Code **user** MCP config — run **`MCP: Open User Configuration`** from the Command Palette (this opens the correct file for the installed version), or edit it directly:
+- Windows: `%APPDATA%\Code\User\mcp.json`
+- macOS: `$HOME/Library/Application Support/Code/User/mcp.json`
+- Linux: `$HOME/.config/Code/User/mcp.json`
+
+Merge the `servers` block from this repo's `mcp.user.json` (the `playwright`, `jira`, and `azure-devops` servers). **Do not copy the `_comment*` fields.** If a `servers` block already exists, add these three into it rather than overwriting. The exact JSON is in [Register MCP servers in VS Code](#register-mcp-servers-in-vs-code).
+
+**Step 5 — Ask the human for credentials (do not set these yourself, and do not accept token values pasted into chat).** The Jira/ADO MCP servers read these environment variables: `JIRA_URL`, `JIRA_PAT`, `ADO_ORG`, `ADO_PAT`. Tell the user to set them with the commands in [Configure environment variables](#configure-environment-variables), and to set only the platform(s) they use.
+
+**Step 6 — Reload and verify.**
+- Reload VS Code (`Developer: Reload Window`) or restart it so the settings and MCP servers load. On macOS/Linux, relaunch from a terminal where the env vars are visible (`code .`).
+- In Copilot Chat, open the **agent dropdown** → confirm **E2E Analyst** and the other four agents appear.
+- Type `/` in chat → confirm **/e2e-testing** is listed.
+- Confirm `playwright`, `jira`, and `azure-devops` show as connected MCP servers.
+- Report which checks passed. For any that failed, see [Troubleshooting](#troubleshooting).
+
+**Not part of global setup:** dependencies and browser binaries are installed **per Playwright project**, on first use — see [Per-project setup](#per-project-setup). Don't do that here.
+
+---
 
 ### What gets installed where
 
@@ -126,11 +194,17 @@ The installer copies files to `~/.copilot/`.
     └── e2e-testing.prompt.md
 ```
 
-> **Path note:** This framework targets the VS Code Copilot user-profile convention (`~/.copilot/`). If your VS Code installation expects a different location, you can override via the `chat.agentFilesLocations` and `chat.promptFilesLocations` settings to point at this directory.
+Plus two entries in your VS Code **user** config: the `chat.*FilesLocations` settings (Step 3) and the three MCP servers (Step 4).
+
+### Prefer to do it by hand?
+
+Run the Step 2 copy commands yourself, add the Step 3 settings, paste the [MCP JSON](#register-mcp-servers-in-vs-code), and set the [env vars](#configure-environment-variables). Same result — the runbook is just these steps automated by Copilot.
 
 ---
 
 ## Configure environment variables
+
+> The [Setup runbook](#agent-setup-runbook) (Step 5) prompts you to set these. The commands below are exactly what to run — set only the platform(s) you use.
 
 The framework reads four environment variables from your shell.
 
@@ -176,6 +250,8 @@ source ~/.bashrc   # or ~/.zshrc
 ---
 
 ## Register MCP servers in VS Code
+
+> The [Setup runbook](#agent-setup-runbook) (Step 4) does this for you. This section is the canonical JSON it merges — and your manual reference.
 
 The three MCP servers are configured at the **VS Code user level** so they're available in every project.
 
@@ -473,10 +549,8 @@ To also remove the MCP servers, open `MCP: Open User Configuration` and delete t
 
 ```
 e2e-copilot-framework/
-├── README.md
-├── install.ps1                                # Windows installer
-├── install.sh                                 # Unix/Mac installer
-├── mcp.user.json                              # paste into VS Code User MCP config
+├── README.md                                  # also the agent setup runbook
+├── mcp.user.json                              # MCP servers to merge into VS Code User config
 ├── agents/
 │   ├── e2e-analyst.agent.md
 │   ├── e2e-scenario-writer.agent.md
